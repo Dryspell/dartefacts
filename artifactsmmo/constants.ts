@@ -1,0 +1,1 @@
+export const ARTIFACTS_BASE_URL = "https://api.artifactsmmo.com";
