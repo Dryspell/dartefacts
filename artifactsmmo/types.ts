@@ -58,7 +58,7 @@ export type Craft = {
 	level: number;
 	items: ItemElement[];
 	quantity: number;
-};
+} | null;
 
 export type ItemElement = {
 	code: string;
@@ -93,3 +93,29 @@ export type ErBlockedHits = {
 	air: number;
 	total: number;
 };
+
+export type MonsterData = {
+	name: string;
+	code: string;
+	level: number;
+	hp: number;
+	attack_fire: number;
+	attack_earth: number;
+	attack_water: number;
+	attack_air: number;
+	res_fire: number;
+	res_earth: number;
+	res_water: number;
+	res_air: number;
+	min_gold: number;
+	max_gold: number;
+	drops: Drop[];
+};
+
+export type ResourceData = {
+    name:  string;
+    code:  string;
+    skill: string;
+    level: number;
+    drops: Drop[];
+}
