@@ -7,11 +7,13 @@ import {
 	restCharacter,
 	unequip,
 } from "./actions.ts";
-import { CharacterData } from "./types.ts";
+import { findCraftableFood } from "./items.ts";
+import { findClosestContent } from "./maps.ts";
+import { ActionQueue, CharacterData } from "./types.ts";
 
 export const craftAndEquipWoodenStaff = (
 	character: CharacterData,
-	actionQueue: Array<() => Promise<any>>
+	actionQueue: ActionQueue
 ) => [
 	async () =>
 		await moveCharacter(character, {
@@ -22,7 +24,7 @@ export const craftAndEquipWoodenStaff = (
 		await gather(character).then((res) => {
 			if (!res) return res;
 			if (
-				(character.inventory.find((item) => item.code === "ash_wood")
+				(character.inventory?.find((item) => item.code === "ash_wood")
 					?.quantity ?? 0) < 4
 			)
 				actionQueue.unshift(async () => await gather(character));
@@ -40,7 +42,7 @@ export const craftAndEquipWoodenStaff = (
 
 export const fightChickens = (
 	character: CharacterData,
-	actionQueue: Array<() => Promise<any>>
+	actionQueue: ActionQueue
 ) => [
 	async () =>
 		await moveCharacter(character, {
@@ -49,8 +51,46 @@ export const fightChickens = (
 		}),
 	async () => await fight(character),
 	async () => await restCharacter(character),
-	async () => {
+	() => {
 		actionQueue.unshift(...fightChickens(character, actionQueue));
 		return true;
 	},
 ];
+
+export const craftPossibleFood = (
+	character: CharacterData,
+	actionQueue: ActionQueue
+) => {
+	const craftableFood = findCraftableFood(character);
+
+	if (craftableFood) {
+		console.log(
+			`[${character.name}] is able to craft: ${craftableFood.name}`
+		);
+
+		const closetCooking = findClosestContent(
+			{
+				code: "cooking",
+				type: "workshop",
+			},
+			character
+		);
+		if (closetCooking) {
+			actionQueue.push(
+				...[
+					async () => await moveCharacter(character, closetCooking),
+					async () => await craft(character, craftableFood.code),
+					() => craftPossibleFood(character, actionQueue),
+				]
+			);
+		} else {
+			console.log(
+				`[${character.name}] is unable to find a cooking workshop`
+			);
+		}
+	} else {
+		console.log(`[${character.name}] is unable to craft any food`);
+	}
+
+	return true;
+};

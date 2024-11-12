@@ -1,13 +1,13 @@
 // deno run --allow-net --allow-env --allow-read artifactsmmo/bot.ts
 import "jsr:@std/dotenv/load";
-import {
-	artifactsHeaders,
-	equip,
-	restCharacter,
-} from "./actions.ts";
+import { artifactsHeaders, equip, restCharacter } from "./actions.ts";
 import { ARTIFACTS_BASE_URL } from "./constants.ts";
-import { CharacterData } from "./types.ts";
-import { craftAndEquipWoodenStaff, fightChickens } from "./actionFlows.ts";
+import { ActionQueue, CharacterData } from "./types.ts";
+import {
+	craftAndEquipWoodenStaff,
+	craftPossibleFood,
+	fightChickens,
+} from "./actionFlows.ts";
 
 const runBot = async () => {
 	const api_key = Deno.env.get("ARTIFACTS_API_KEY");
@@ -31,7 +31,7 @@ const runBot = async () => {
 
 	await Promise.all(
 		characters.map(async (character) => {
-			const actionQueue = [] as Array<() => Promise<any>>;
+			const actionQueue = [] as ActionQueue;
 
 			if (character.hp < character.max_hp) {
 				// Heal
@@ -40,8 +40,13 @@ const runBot = async () => {
 				actionQueue.push(async () => await restCharacter(character));
 			}
 
+			// Craft food if we can.
+			craftPossibleFood(character, actionQueue);
+
 			if (
-				character.inventory.find((item) => item.code === "wooden_staff")
+				character.inventory?.find(
+					(item) => item.code === "wooden_staff"
+				)
 			) {
 				actionQueue.push(
 					async () => await equip(character, "weapon", "wooden_staff")

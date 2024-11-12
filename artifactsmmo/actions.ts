@@ -259,39 +259,62 @@ export async function equip(
 	});
 }
 
+// export async function fight(character: CharacterData) {
+// 	return await fetch(
+// 		`${ARTIFACTS_BASE_URL}/my/${character.name}/action/fight`,
+// 		{
+// 			method: "POST",
+// 			headers: artifactsHeaders(),
+// 		}
+// 	).then(async (res) => {
+// 		if (res.status === 200) {
+// 			const result = (await res.json()) as {
+// 				data: {
+// 					fight: Fight;
+// 					cooldown: Cooldown;
+// 					character: CharacterData;
+// 				};
+// 			};
+// 			console.log(
+// 				`Fought with ${character.name}`,
+// 				result.data.fight.logs
+// 			);
+// 			character = result.data.character;
+// 			await sleep(
+// 				result.data.cooldown.remaining_seconds * 1000,
+// 				result.data.cooldown.reason
+// 			);
+// 			return result;
+// 		} else {
+// 			console.log(
+// 				`Failed to fight with ${character.name}`,
+// 				res.status,
+// 				await res.text()
+// 			);
+// 			return null;
+// 		}
+// 	});
+// }
+
+import createClient from "openapi-fetch";
+import type { paths } from "./api.ts";
+const client = createClient<paths>({ baseUrl: ARTIFACTS_BASE_URL });
+
 export async function fight(character: CharacterData) {
-	return await fetch(
-		`${ARTIFACTS_BASE_URL}/my/${character.name}/action/fight`,
-		{
-			method: "POST",
-			headers: artifactsHeaders(),
-		}
-	).then(async (res) => {
-		if (res.status === 200) {
-			const result = (await res.json()) as {
-				data: {
-					fight: Fight;
-					cooldown: Cooldown;
-					character: CharacterData;
-				};
-			};
-			console.log(
-				`Fought with ${character.name}`,
-				result.data.fight.logs
-			);
-			character = result.data.character;
-			await sleep(
-				result.data.cooldown.remaining_seconds * 1000,
-				result.data.cooldown.reason
-			);
-			return result;
-		} else {
-			console.log(
-				`Failed to fight with ${character.name}`,
-				res.status,
-				await res.text()
-			);
-			return null;
-		}
+	const { data, error } = await client.POST("/my/{name}/action/fight", {
+		params: { path: { name: character.name }, headers: artifactsHeaders() },
 	});
+
+	if (error || !data) {
+		console.log(`Failed to fight with ${character.name}`, error);
+		return null;
+	}
+
+	console.log(`Fought with ${character.name}`, data.data.fight.logs);
+	character = data.data.character;
+	await sleep(
+		data.data.cooldown.remaining_seconds * 1000,
+		data.data.cooldown.reason
+	);
+	return data.data;
 }
