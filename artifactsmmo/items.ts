@@ -7,24 +7,31 @@ import {
   findClosestMonsterWithDrop,
   findClosestResource,
 } from "./maps.ts";
+import { craftingSkills, equipmentSlots } from "./constants.ts";
 
-const equipmentSlots = [
-  { slot_key: "weapon_slot", type: "weapon" },
-  { slot_key: "shield_slot", type: "shield" },
-  { slot_key: "helmet_slot", type: "helmet" },
-  { slot_key: "body_armor_slot", type: "body_armor" },
-  { slot_key: "leg_armor_slot", type: "leg_armor" },
-  { slot_key: "boots_slot", type: "boots" },
-  { slot_key: "ring1_slot", type: "ring" },
-  { slot_key: "ring2_slot", type: "ring" },
-  { slot_key: "amulet_slot", type: "amulet" },
-  { slot_key: "artifact1_slot", type: "artifact" },
-  { slot_key: "artifact2_slot", type: "artifact" },
-  { slot_key: "artifact3_slot", type: "artifact" },
-  { slot_key: "utility1_slot", type: "utility" },
-  { slot_key: "utility1_slot", type: "utility" },
-  { slot_key: "utility1_slot", type: "utility" },
-] as const;
+export const findHighestCraftableItem = (
+  character: CharacterData,
+  skillData: {
+    skill: (typeof craftingSkills)[number];
+    level: number;
+  },
+) => {
+  const craftableItems = items.filter((item) =>
+    item.craft?.skill === skillData.skill && (item.craft?.level ?? 0) <=
+      character?.[`${skillData.skill}_level`]
+  );
+  const highestCraftableItem =
+    craftableItems.sort((a, b) => b.level - a.level)[0];
+
+  if (highestCraftableItem) {
+    return highestCraftableItem;
+  } else {
+    return items.filter((item) =>
+      item.type === "resource" && item.subtype === skillData.skill &&
+      item.level <= character?.[`${skillData.skill}_level`]
+    ).sort((a, b) => b.level - a.level)[0];
+  }
+};
 
 const findBestInSlot = (
   slot: typeof equipmentSlots[number],
@@ -45,26 +52,22 @@ const findBestInSlot = (
   return bestItem;
 };
 
-const findBestEquipment = (character: CharacterData) =>
+export const findBestEquipment = (character: CharacterData) =>
   equipmentSlots.map((slot) => ({
     ...slot,
     best: findBestInSlot(slot, character),
   })).filter((equipment) =>
     equipment.best && character[equipment.slot_key] !== equipment.best.code
   ).sort((a, b) => character[a.slot_key] ? 1 : -1)[0];
-console.log(
-  JSON.stringify(findBestEquipment(characters[0] as CharacterData), null, 2),
-);
+// console.log(
+//   JSON.stringify(findBestEquipment(characters[0] as CharacterData), null, 2),
+// );
 
-export const createCraftingPlan = (character: CharacterData) => {
-  const bestInSlot = equipmentSlots.map((slot) => ({
-    ...slot,
-    best: findBestInSlot(slot, character),
-  })).filter((equipment) =>
-    equipment.best && character[equipment.slot_key] !== equipment.best.code
-  ).sort((a, b) => character[a.slot_key] ? 1 : -1)[0];
-  if (!bestInSlot) {
-    console.log(`[${character.name}] already has best in slot equipment`);
+export const createCraftingPlan = (
+  character: CharacterData,
+  itemToCraft: ReturnType<typeof findBestInSlot>,
+) => {
+  if (!itemToCraft) {
     return null;
   }
 
@@ -76,9 +79,9 @@ export const createCraftingPlan = (character: CharacterData) => {
   };
 
   const walkItemRecipeTree = (inputItem: DataItem, quantity = 1) => {
-    console.log(
-      `[${character.name}] walking tree for ${inputItem.name} x ${quantity}`,
-    );
+    // console.log(
+    //   `[${character.name}] walking tree for ${inputItem.name} x ${quantity}`,
+    // );
     const amountInInventory = getAmountInInventory(inputItem.code);
 
     console.log(
@@ -114,7 +117,7 @@ export const createCraftingPlan = (character: CharacterData) => {
     }
   };
 
-  walkItemRecipeTree(bestInSlot.best);
+  walkItemRecipeTree(itemToCraft);
 
   const firstItemNeeded = itemsNeeded[0] &&
     items.find((i) => i.code === itemsNeeded[0].code);
@@ -128,20 +131,25 @@ export const createCraftingPlan = (character: CharacterData) => {
       const closest = firstItemNeeded.subtype === "mob"
         ? findClosestMonsterWithDrop(firstItemNeeded.code, character)
         : findClosestResource(firstItemNeeded.code, character);
-      return { bestInSlot, itemsNeeded, closest };
+      return { itemToCraft, itemsNeeded, closest };
     } else {
       const closest = findClosestContent({
         type: "workshop",
         code: firstItemNeeded.craft.skill,
       }, character);
-      return { bestInSlot, itemsNeeded, closest };
+      return { itemToCraft, itemsNeeded, closest };
     }
   } else {
-    return { bestInSlot, itemsNeeded };
+    return { itemToCraft, itemsNeeded };
   }
 };
 
-console.log(createCraftingPlan(characters[0] as CharacterData));
+console.log(
+  createCraftingPlan(
+    characters[0] as CharacterData,
+    findBestEquipment(characters[0] as CharacterData)?.best,
+  ),
+);
 
 export const findCraftableFood = (character: CharacterData) => {
   const food =

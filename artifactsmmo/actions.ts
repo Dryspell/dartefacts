@@ -42,6 +42,7 @@ export async function restCharacter(character: CharacterData) {
       await sleep(
         result.data.cooldown.remaining_seconds * 1000,
         result.data.cooldown.reason,
+        character.name,
       );
       return result;
     } else {
@@ -86,6 +87,7 @@ export async function moveCharacter(
       await sleep(
         result.data.cooldown.remaining_seconds * 1000,
         result.data.cooldown.reason,
+        character.name,
       );
       return result;
     } else {
@@ -127,6 +129,7 @@ export async function gather(character: CharacterData) {
       await sleep(
         result.data.cooldown.remaining_seconds * 1000,
         result.data.cooldown.reason,
+        character.name,
       );
       return result;
     } else {
@@ -174,6 +177,7 @@ export async function unequip(
       await sleep(
         result.data.cooldown.remaining_seconds * 1000,
         result.data.cooldown.reason,
+        character.name,
       );
       return result;
     } else {
@@ -210,6 +214,7 @@ export async function craft(character: CharacterData, item_code: string) {
       await sleep(
         result.data.cooldown.remaining_seconds * 1000,
         result.data.cooldown.reason,
+        character.name,
       );
       return result;
     } else {
@@ -252,6 +257,7 @@ export async function equip(
       await sleep(
         result.data.cooldown.remaining_seconds * 1000,
         result.data.cooldown.reason,
+        character.name,
       );
       return result;
     } else {
@@ -323,6 +329,7 @@ export async function fight(character: CharacterData) {
   await sleep(
     data.data.cooldown.remaining_seconds * 1000,
     data.data.cooldown.reason,
+    character.name,
   );
   return data.data;
 }
@@ -345,6 +352,7 @@ export async function use(character: CharacterData, item_code: string) {
   await sleep(
     data.data.cooldown.remaining_seconds * 1000,
     data.data.cooldown.reason,
+    character.name,
   );
   return data.data;
 }
@@ -370,6 +378,33 @@ export async function deposit(
   await sleep(
     data.data.cooldown.remaining_seconds * 1000,
     data.data.cooldown.reason,
+    character.name,
+  );
+  return data.data;
+}
+
+export async function recycle(
+  character: CharacterData,
+  { item_code, quantity }: { item_code: string; quantity: number },
+) {
+  const { data, error } = await client.POST("/my/{name}/action/recycling", {
+    params: { path: { name: character.name } },
+    body: { code: item_code, quantity },
+    headers: artifactsHeaders(),
+  });
+
+  if (error || !data) {
+    console.log(`Failed to recycle with ${character.name}`, error);
+    return null;
+  }
+
+  console.log(`Recycled with ${character.name}`);
+
+  Object.assign(character, data.data.character);
+  await sleep(
+    data.data.cooldown.remaining_seconds * 1000,
+    data.data.cooldown.reason,
+    character.name,
   );
   return data.data;
 }

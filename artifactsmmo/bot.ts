@@ -9,6 +9,7 @@ import {
   craftPossibleFood,
   fightChickens,
   healCharacter,
+  trainWeakestCraftingSkill,
 } from "./actionFlows.ts";
 
 const runBot = async () => {
@@ -42,21 +43,7 @@ const runBot = async () => {
 
       craftBestInSlot(character, actionQueue);
 
-      // if (
-      //   character.inventory?.find(
-      //     (item) => item.code === "wooden_staff",
-      //   )
-      // ) {
-      //   actionQueue.push(
-      //     async () => await equip(character, "weapon", "wooden_staff"),
-      //   );
-      // } else if (character.weapon_slot === "wooden_staff") {
-      //   actionQueue.push(...fightChickens(character, actionQueue));
-      // } else {
-      //   actionQueue.push(
-      //     ...craftAndEquipWoodenStaff(character, actionQueue),
-      //   );
-      // }
+      trainWeakestCraftingSkill(character, actionQueue);
 
       while (actionQueue.length) {
         const action = actionQueue.shift();
