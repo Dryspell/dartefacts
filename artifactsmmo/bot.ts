@@ -7,6 +7,7 @@ import {
 	craftAndEquipWoodenStaff,
 	craftPossibleFood,
 	fightChickens,
+	healCharacter,
 } from "./actionFlows.ts";
 
 const runBot = async () => {
@@ -33,12 +34,7 @@ const runBot = async () => {
 		characters.map(async (character) => {
 			const actionQueue = [] as ActionQueue;
 
-			if (character.hp < character.max_hp) {
-				// Heal
-				// If we had food or healing spells cast them otherwise just rest
-
-				actionQueue.push(async () => await restCharacter(character));
-			}
+			healCharacter(character, actionQueue);
 
 			// Craft food if we can.
 			craftPossibleFood(character, actionQueue);

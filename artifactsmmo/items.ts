@@ -24,11 +24,17 @@ const findBestInSlot = (slot: typeof equipmentSlots[number], level: number) => {
   return bestItem;
 }
 
-const bestEquipment = equipmentSlots.map(slot => ({...slot, best: findBestInSlot(slot, 3)})).filter(equipment => Boolean(equipment.best));
-console.log(JSON.stringify(bestEquipment, null, 2));
+// const bestEquipment = equipmentSlots.map(slot => ({...slot, best: findBestInSlot(slot, 3)})).filter(equipment => Boolean(equipment.best));
+// console.log(JSON.stringify(bestEquipment, null, 2));
 
 export const findCraftableFood = (character: CharacterData) => {
-  const food = items.filter(item => item.type === "food" && item.craft && item.craft.skill === "cooking" && item.craft.items.every(item => character.inventory?.find(i => i.code === item.code && i.quantity >= item.quantity))).sort((a,b) => b.level - a.level)[0];
+  const food = items.filter(item => item.type === "consumable" && item.subtype === "food" && item.craft && item.craft.skill === "cooking" && item.craft.level <= character.cooking_level && item.craft.items.every(item => character.inventory?.find(i => i.code === item.code && i.quantity >= item.quantity))).sort((a,b) => (b.craft?.level ?? 0) - (a.craft?.level ?? 0))[0];
 
   return food;
+}
+
+const healingItems = items.filter(item => item.type === "consumable" && item.subtype === "food" && item.effects.some(effect => effect.name === "heal"));
+
+export const getHealingItemsInInventory = (character: CharacterData) => {
+  return character.inventory?.filter(item => healingItems.some(healingItem => healingItem.code === item.code));
 }

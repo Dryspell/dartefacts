@@ -6,8 +6,9 @@ import {
 	moveCharacter,
 	restCharacter,
 	unequip,
+	use,
 } from "./actions.ts";
-import { findCraftableFood } from "./items.ts";
+import { findCraftableFood, getHealingItemsInInventory } from "./items.ts";
 import { findClosestContent } from "./maps.ts";
 import { ActionQueue, CharacterData } from "./types.ts";
 
@@ -50,7 +51,7 @@ export const fightChickens = (
 			y: 1,
 		}),
 	async () => await fight(character),
-	async () => await restCharacter(character),
+	() => healCharacter(character, actionQueue),
 	() => {
 		actionQueue.unshift(...fightChickens(character, actionQueue));
 		return true;
@@ -76,7 +77,7 @@ export const craftPossibleFood = (
 			character
 		);
 		if (closetCooking) {
-			actionQueue.push(
+			actionQueue.unshift(
 				...[
 					async () => await moveCharacter(character, closetCooking),
 					async () => await craft(character, craftableFood.code),
@@ -90,6 +91,30 @@ export const craftPossibleFood = (
 		}
 	} else {
 		console.log(`[${character.name}] is unable to craft any food`);
+	}
+
+	return true;
+};
+
+export const healCharacter = (
+	character: CharacterData,
+	actionQueue: ActionQueue
+) => {
+	if (character.hp < character.max_hp) {
+		const healingItemsInInventory = getHealingItemsInInventory(character);
+		if (healingItemsInInventory?.length) {
+			actionQueue.unshift(
+				...[
+					async () => {
+						const healingItem = healingItemsInInventory[0];
+						return await use(character, healingItem.code);
+					},
+					() => healCharacter(character, actionQueue),
+				]
+			);
+		} else {
+			actionQueue.unshift(async () => await restCharacter(character));
+		}
 	}
 
 	return true;

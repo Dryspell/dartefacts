@@ -5,7 +5,6 @@ import type {
 	GatherDetails,
 	Destination,
 	DataItem,
-	Fight,
 } from "./types.ts";
 import { sleep } from "./utils.ts";
 
@@ -36,9 +35,10 @@ export async function restCharacter(character: CharacterData) {
 				};
 			};
 			console.log(
-				`Healed ${character.name} for ${result.data.hp_restored} HP`
+				`[${character.name}] Healed for ${result.data.hp_restored} HP`
 			);
-			character = result.data.character;
+
+			Object.assign(character, result.data.character);
 			await sleep(
 				result.data.cooldown.remaining_seconds * 1000,
 				result.data.cooldown.reason
@@ -46,7 +46,7 @@ export async function restCharacter(character: CharacterData) {
 			return result;
 		} else {
 			console.log(
-				`Failed to heal ${character.name}`,
+				`[${character.name}] Failed to heal`,
 				res.status,
 				await res.text()
 			);
@@ -60,7 +60,7 @@ export async function moveCharacter(
 	pos: { x: number; y: number }
 ) {
 	if (character.x === pos.x && character.y === pos.y) {
-		console.log(`${character.name} is already at ${pos.x},${pos.y}`);
+		// console.log(`${character.name} is already at ${pos.x},${pos.y}`);
 		return character;
 	}
 
@@ -80,8 +80,9 @@ export async function moveCharacter(
 					character: CharacterData;
 				};
 			};
-			console.log(`Moved ${character.name} to ${pos.x},${pos.y}`);
-			character = result.data.character;
+			console.log(`[${character.name}] Moved to ${pos.x},${pos.y}`);
+
+			Object.assign(character, result.data.character);
 			await sleep(
 				result.data.cooldown.remaining_seconds * 1000,
 				result.data.cooldown.reason
@@ -89,7 +90,7 @@ export async function moveCharacter(
 			return result;
 		} else {
 			console.log(
-				`Failed to move ${character.name}`,
+				`[${character.name}] Failed to move to ${pos.x},${pos.y}`,
 				res.status,
 				await res.text()
 			);
@@ -115,11 +116,12 @@ export async function gather(character: CharacterData) {
 				};
 			};
 			console.log(
-				`Gathered ${result.data.details.items.map(
+				`[${character.name}] Gathered ${result.data.details.items.map(
 					(item) => `${item.code}: ${item.quantity}`
-				)} with ${character.name}`
+				)}`
 			);
-			character = result.data.character;
+
+			Object.assign(character, result.data.character);
 			await sleep(
 				result.data.cooldown.remaining_seconds * 1000,
 				result.data.cooldown.reason
@@ -127,7 +129,7 @@ export async function gather(character: CharacterData) {
 			return result;
 		} else {
 			console.log(
-				`Failed to gather with ${character.name}`,
+				`[${character.name}] Failed to gather`,
 				res.status,
 				await res.text()
 			);
@@ -142,7 +144,7 @@ export async function unequip(
 	quantity: number = 1
 ) {
 	if (!character.weapon_slot) {
-		console.log(`${character.name} has no weapon equipped`);
+		console.log(`[${character.name}] no weapon equipped`);
 		return character;
 	}
 
@@ -163,8 +165,9 @@ export async function unequip(
 					character: CharacterData;
 				};
 			};
-			console.log(`Unequipped ${slot} from ${character.name}`);
-			character = result.data.character;
+			console.log(`[${character.name}] Unequipped ${slot}`);
+
+			Object.assign(character, result.data.character);
 			await sleep(
 				result.data.cooldown.remaining_seconds * 1000,
 				result.data.cooldown.reason
@@ -198,8 +201,9 @@ export async function craft(character: CharacterData, item_code: string) {
 					character: CharacterData;
 				};
 			};
-			console.log(`Crafted ${item_code} with ${character.name}`);
-			character = result.data.character;
+			console.log(`[${character.name}] Crafted ${item_code}`);
+
+			Object.assign(character, result.data.character);
 			await sleep(
 				result.data.cooldown.remaining_seconds * 1000,
 				result.data.cooldown.reason
@@ -207,7 +211,7 @@ export async function craft(character: CharacterData, item_code: string) {
 			return result;
 		} else {
 			console.log(
-				`Failed to craft with ${character.name}`,
+				`[${character.name}] Failed to craft`,
 				res.status,
 				await res.text()
 			);
@@ -239,10 +243,9 @@ export async function equip(
 					character: CharacterData;
 				};
 			};
-			console.log(
-				`Equipped ${item_code} to ${slot} on ${character.name}`
-			);
-			character = result.data.character;
+			console.log(`[${character.name}] Equipped ${item_code} to ${slot}`);
+
+			Object.assign(character, result.data.character);
 			await sleep(
 				result.data.cooldown.remaining_seconds * 1000,
 				result.data.cooldown.reason
@@ -250,7 +253,7 @@ export async function equip(
 			return result;
 		} else {
 			console.log(
-				`Failed to equip ${item_code} to ${slot} on ${character.name}`,
+				`[${character.name}] Failed to equip ${item_code} to ${slot}`,
 				res.status,
 				await res.text()
 			);
@@ -302,7 +305,8 @@ const client = createClient<paths>({ baseUrl: ARTIFACTS_BASE_URL });
 
 export async function fight(character: CharacterData) {
 	const { data, error } = await client.POST("/my/{name}/action/fight", {
-		params: { path: { name: character.name }, headers: artifactsHeaders() },
+		params: { path: { name: character.name } },
+		headers: artifactsHeaders(),
 	});
 
 	if (error || !data) {
@@ -311,7 +315,30 @@ export async function fight(character: CharacterData) {
 	}
 
 	console.log(`Fought with ${character.name}`, data.data.fight.logs);
-	character = data.data.character;
+
+	Object.assign(character, data.data.character);
+	await sleep(
+		data.data.cooldown.remaining_seconds * 1000,
+		data.data.cooldown.reason
+	);
+	return data.data;
+}
+
+export async function use(character: CharacterData, item_code: string) {
+	const { data, error } = await client.POST("/my/{name}/action/use", {
+		params: { path: { name: character.name } },
+		headers: artifactsHeaders(),
+		body: { code: item_code, quantity: 1 },
+	});
+
+	if (error || !data) {
+		console.log(`Failed to use ${item_code} with ${character.name}`, error);
+		return null;
+	}
+
+	console.log(`Used ${item_code} with ${character.name}`);
+
+	Object.assign(character, data.data.character);
 	await sleep(
 		data.data.cooldown.remaining_seconds * 1000,
 		data.data.cooldown.reason
