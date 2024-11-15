@@ -118,7 +118,7 @@ const fetchCharacters = async () => {
     encoder.encode(JSON.stringify(characters, null, 2)),
   );
 };
-fetchCharacters();
+// fetchCharacters();
 
 const fetchResources = async () => {
   const resources: ResourceData[] = [];

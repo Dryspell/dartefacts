@@ -5,8 +5,14 @@ import type {
   DataItem,
   Destination,
   GatherDetails,
+  ItemElement,
 } from "./types.ts";
 import { sleep } from "./utils.ts";
+import createClient from "openapi-fetch";
+import type { paths } from "./api.ts";
+import { bankItems } from "./bot.ts";
+
+export const client = createClient<paths>({ baseUrl: ARTIFACTS_BASE_URL });
 
 export const artifactsHeaders = () => {
   const api_key = Deno.env.get("ARTIFACTS_API_KEY");
@@ -271,47 +277,6 @@ export async function equip(
   });
 }
 
-// export async function fight(character: CharacterData) {
-// 	return await fetch(
-// 		`${ARTIFACTS_BASE_URL}/my/${character.name}/action/fight`,
-// 		{
-// 			method: "POST",
-// 			headers: artifactsHeaders(),
-// 		}
-// 	).then(async (res) => {
-// 		if (res.status === 200) {
-// 			const result = (await res.json()) as {
-// 				data: {
-// 					fight: Fight;
-// 					cooldown: Cooldown;
-// 					character: CharacterData;
-// 				};
-// 			};
-// 			console.log(
-// 				`Fought with ${character.name}`,
-// 				result.data.fight.logs
-// 			);
-// 			character = result.data.character;
-// 			await sleep(
-// 				result.data.cooldown.remaining_seconds * 1000,
-// 				result.data.cooldown.reason
-// 			);
-// 			return result;
-// 		} else {
-// 			console.log(
-// 				`Failed to fight with ${character.name}`,
-// 				res.status,
-// 				await res.text()
-// 			);
-// 			return null;
-// 		}
-// 	});
-// }
-
-import createClient from "openapi-fetch";
-import type { paths } from "./api.ts";
-const client = createClient<paths>({ baseUrl: ARTIFACTS_BASE_URL });
-
 export async function fight(character: CharacterData) {
   const { data, error } = await client.POST("/my/{name}/action/fight", {
     params: { path: { name: character.name } },
@@ -342,11 +307,11 @@ export async function use(character: CharacterData, item_code: string) {
   });
 
   if (error || !data) {
-    console.log(`Failed to use ${item_code} with ${character.name}`, error);
+    console.log(`[${character.name}] Failed to use ${item_code}`, error);
     return null;
   }
 
-  console.log(`Used ${item_code} with ${character.name}`);
+  console.log(`[${character.name}] Used ${item_code}`);
 
   Object.assign(character, data.data.character);
   await sleep(
@@ -368,13 +333,53 @@ export async function deposit(
   });
 
   if (error || !data) {
-    console.log(`Failed to deposit with ${character.name}`, error);
+    console.log(
+      `[${character.name}] Failed to deposit ${quantity} x ${item_code}`,
+      error,
+    );
     return null;
   }
 
-  console.log(`Deposited with ${character.name}`);
+  console.log(
+    `[${character.name}] Deposited to bank ${quantity} x ${item_code}`,
+  );
 
   Object.assign(character, data.data.character);
+  bankItems?.bank && Object.assign(bankItems.bank, data.data.bank);
+
+  await sleep(
+    data.data.cooldown.remaining_seconds * 1000,
+    data.data.cooldown.reason,
+    character.name,
+  );
+  return data.data;
+}
+
+export async function withdraw(
+  character: CharacterData,
+  { item_code, quantity }: { item_code: string; quantity: number },
+) {
+  const { data, error } = await client.POST("/my/{name}/action/bank/withdraw", {
+    params: { path: { name: character.name } },
+    body: { code: item_code, quantity },
+    headers: artifactsHeaders(),
+  });
+
+  if (error || !data) {
+    console.log(
+      `[${character.name}] Failed to withdraw ${quantity} x ${item_code}`,
+      error,
+    );
+    return null;
+  }
+
+  console.log(
+    `[${character.name}] Withdrew from bank ${quantity} x ${item_code}`,
+  );
+
+  Object.assign(character, data.data.character);
+  bankItems?.bank && Object.assign(bankItems.bank, data.data.bank);
+
   await sleep(
     data.data.cooldown.remaining_seconds * 1000,
     data.data.cooldown.reason,
@@ -394,11 +399,14 @@ export async function recycle(
   });
 
   if (error || !data) {
-    console.log(`Failed to recycle with ${character.name}`, error);
+    console.log(
+      `[${character.name}] Failed to recycle ${quantity} x ${item_code}`,
+      error,
+    );
     return null;
   }
 
-  console.log(`Recycled with ${character.name}`);
+  console.log(`[${character.name}] Recycled ${quantity} x ${item_code}`);
 
   Object.assign(character, data.data.character);
   await sleep(
@@ -408,3 +416,43 @@ export async function recycle(
   );
   return data.data;
 }
+
+export async function getBankItems(
+  character: CharacterData,
+  { item_code }: { item_code: string },
+) {
+  const { data, error } = await client.GET("/my/bank/items", {
+    params: { query: { item_code } },
+    headers: artifactsHeaders(),
+  });
+
+  if (error || !data) {
+    console.log(`[${character.name}] Failed to get bank items`, error);
+    return null;
+  }
+
+  console.log(`[${character.name}] Got bank items`);
+
+  return data.data;
+}
+
+export const getBankItemsAvailable = (itemsNeeded: ItemElement[]) => {
+  if (!bankItems) return [];
+
+  const claimed = bankItems.claimed.filter((i) =>
+    itemsNeeded.some((itemNeeded) => itemNeeded.code === i.code)
+  );
+
+  const available = bankItems.bank.filter((i) =>
+    itemsNeeded.some((itemNeeded) => itemNeeded.code === i.code)
+  ).map((i) => ({
+    ...i,
+    quantity: Math.min(
+      itemsNeeded.find((itn) => itn.code === i.code)?.quantity ?? 0,
+      i.quantity -
+        (claimed.find((c) => c.code === i.code)?.quantity ?? 0),
+    ),
+  })).filter((i) => i.quantity > 0);
+
+  return available;
+};

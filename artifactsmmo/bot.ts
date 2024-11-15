@@ -1,16 +1,17 @@
 // deno run --allow-net --allow-env --allow-read artifactsmmo/bot.ts
 import "jsr:@std/dotenv/load";
-import { artifactsHeaders, equip } from "./actions.ts";
+import { artifactsHeaders } from "./actions.ts";
 import { ARTIFACTS_BASE_URL } from "./constants.ts";
 import { ActionQueue, CharacterData } from "./types.ts";
 import {
-  craftAndEquipWoodenStaff,
   craftBestInSlot,
   craftPossibleFood,
-  fightChickens,
   healCharacter,
   trainWeakestCraftingSkill,
 } from "./actionFlows.ts";
+import { getAllBankItems } from "./items.ts";
+
+export const bankItems = await getAllBankItems();
 
 const runBot = async () => {
   const api_key = Deno.env.get("ARTIFACTS_API_KEY");

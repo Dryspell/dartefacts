@@ -1,6 +1,5 @@
 import items from "./static/items.json" with { type: "json" };
-import characters from "./static/characters.json" with { type: "json" };
-import { DataItem } from "./types.ts";
+import { DataItem, ItemElement } from "./types.ts";
 import { CharacterData } from "./types.ts";
 import {
   findClosestContent,
@@ -8,6 +7,7 @@ import {
   findClosestResource,
 } from "./maps.ts";
 import { craftingSkills, equipmentSlots } from "./constants.ts";
+import { artifactsHeaders, client } from "./actions.ts";
 
 export const findHighestCraftableItem = (
   character: CharacterData,
@@ -122,10 +122,11 @@ export const createCraftingPlan = (
   const firstItemNeeded = itemsNeeded[0] &&
     items.find((i) => i.code === itemsNeeded[0].code);
   if (firstItemNeeded) {
-    console.log(`[${character.name}] needs to craft:`);
-    itemsNeeded.forEach((item) => {
-      console.log(`[${character.name}] ${item.quantity} x ${item.code}`);
-    });
+    console.log(
+      `[${character.name}] needs to craft: ${
+        itemsNeeded.map((item) => `${item.quantity} x ${item.code}`).join(", ")
+      }`,
+    );
 
     if (!firstItemNeeded.craft) {
       const closest = firstItemNeeded.subtype === "mob"
@@ -144,12 +145,12 @@ export const createCraftingPlan = (
   }
 };
 
-console.log(
-  createCraftingPlan(
-    characters[0] as CharacterData,
-    findBestEquipment(characters[0] as CharacterData)?.best,
-  ),
-);
+// console.log(
+//   createCraftingPlan(
+//     characters[0] as CharacterData,
+//     findBestEquipment(characters[0] as CharacterData)?.best,
+//   ),
+// );
 
 export const findCraftableFood = (character: CharacterData) => {
   const food =
@@ -176,4 +177,29 @@ export const getHealingItemsInInventory = (character: CharacterData) => {
   return healingItems.filter((healingItem) =>
     character.inventory?.find((item) => item.code === healingItem.code)
   ).sort((a, b) => b.effects[0].value - a.effects[0].value);
+};
+
+export const getAllBankItems = async () => {
+  const items: ItemElement[] = [];
+  let page: number = 1;
+  const size: number = 100;
+  let pages = 2;
+
+  while (page < pages) {
+    const { data, error } = await client.GET("/my/bank/items", {
+      params: { query: { page, size } },
+      headers: artifactsHeaders(),
+    });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    pages = data.pages ?? 0;
+    page = (data.page ?? page) + 1;
+    items.push(...data.data);
+  }
+
+  return { bank: items, claimed: [] as ItemElement[] };
 };

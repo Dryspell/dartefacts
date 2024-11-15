@@ -4,12 +4,16 @@ import {
   equip,
   fight,
   gather,
+  getBankItems,
+  getBankItemsAvailable,
   moveCharacter,
   recycle,
   restCharacter,
   unequip,
   use,
+  withdraw,
 } from "./actions.ts";
+import { bankItems } from "./bot.ts";
 import { craftingSkills, equipmentSlots } from "./constants.ts";
 import {
   createCraftingPlan,
@@ -149,7 +153,7 @@ export const craftBestInSlot = (
           bestEquipment.slot_key.split("_")[0],
           bestEquipment.best.code,
         ),
-      () => craftBestInSlot(character, actionQueue),
+      async () => await craftBestInSlot(character, actionQueue),
     );
     return true;
   }
@@ -162,7 +166,7 @@ export const craftBestInSlot = (
   );
 };
 
-export const trainWeakestCraftingSkill = (
+export const trainWeakestCraftingSkill = async (
   character: CharacterData,
   actionQueue: ActionQueue,
 ) => {
@@ -184,26 +188,18 @@ export const trainWeakestCraftingSkill = (
     weakestSkill,
   );
 
-  if (highestCraftableItem.type === "resource") {
-    console.log(
-      `[${character.name}] is training ${weakestSkill.skill} by gathering ${highestCraftableItem?.name}`,
-    );
-    const closest = findClosestResource(highestCraftableItem.code, character);
-    actionQueue.unshift(
-      async () => await moveCharacter(character, closest),
-      async () => await gather(character),
-      () => trainWeakestCraftingSkill(character, actionQueue),
-    );
-    return true;
-  }
+  const craftableItemInInventory = character.inventory &&
+    character.inventory.find((i) => i.code === highestCraftableItem?.code);
 
   if (
-    character.inventory?.find((i) => i.code === highestCraftableItem?.code) &&
-    !["utility", "consumable"].includes(highestCraftableItem.type) &&
+    craftableItemInInventory &&
+    !["utility", "consumable", "resource"].includes(
+      highestCraftableItem.type,
+    ) &&
     highestCraftableItem.craft?.skill
   ) {
     actionQueue.unshift(
-      async () =>
+      () =>
         moveCharacter(
           character,
           findClosestContent({
@@ -218,8 +214,39 @@ export const trainWeakestCraftingSkill = (
             i.code === highestCraftableItem?.code
           )?.quantity ?? 1,
         }),
-      () => trainWeakestCraftingSkill(character, actionQueue),
+      async () => await trainWeakestCraftingSkill(character, actionQueue),
     );
+    return true;
+  } else if (craftableItemInInventory && highestCraftableItem.craft) {
+    console.log(
+      `[${character.name}] already has ${highestCraftableItem?.name} in inventory, depositing`,
+    );
+    actionQueue.unshift(
+      async () => await moveCharacter(character, { x: 4, y: 1 }),
+      async () =>
+        await deposit(character, {
+          item_code: craftableItemInInventory.code,
+          quantity: craftableItemInInventory.quantity,
+        }),
+      async () => await trainWeakestCraftingSkill(character, actionQueue),
+    );
+    return true;
+  }
+
+  if (
+    highestCraftableItem.type === "resource" &&
+    highestCraftableItem.subtype === weakestSkill.skill
+  ) {
+    console.log(
+      `[${character.name}] is training ${weakestSkill.skill} by gathering ${highestCraftableItem?.name}`,
+    );
+    const closest = findClosestResource(highestCraftableItem.code, character);
+    actionQueue.unshift(
+      async () => await moveCharacter(character, closest),
+      async () => await gather(character),
+      async () => await trainWeakestCraftingSkill(character, actionQueue),
+    );
+    return true;
   }
 
   console.log(
@@ -234,14 +261,14 @@ export const trainWeakestCraftingSkill = (
   );
 };
 
-function craftingFlow(
+async function craftingFlow(
   character: CharacterData,
   itemToCraft: ReturnType<typeof findHighestCraftableItem>,
   actionQueue: ActionQueue,
   flowToResume: (
     character: CharacterData,
     actionQueue: ActionQueue,
-  ) => boolean | undefined,
+  ) => boolean | Promise<boolean> | undefined,
 ) {
   const craftingPlan = createCraftingPlan(character, itemToCraft);
 
@@ -265,7 +292,48 @@ function craftingFlow(
       ).map((i) => async () =>
         await deposit(character, { item_code: i.code, quantity: i.quantity })
       ),
-      () => flowToResume(character, actionQueue),
+      async () => await flowToResume(character, actionQueue),
+    );
+    return true;
+  }
+
+  // // check if bank has the items needed
+  const bankItemsNeeded = getBankItemsAvailable(craftingPlan.itemsNeeded);
+  if (bankItems && bankItemsNeeded.length) {
+    console.log(
+      `[${character.name}] bank has the items needed: ${
+        bankItemsNeeded.map((bi) => `${bi.quantity} x ${bi.code}`).join(", ")
+      }`,
+    );
+    bankItemsNeeded.forEach((bi) => {
+      const claimed = bankItems?.claimed.find((c) => c.code === bi.code);
+      if (claimed) {
+        claimed.quantity -= bi.quantity;
+        console.log(
+          `[${character.name}] is claiming ${bi.quantity} x ${bi.code} from the bank, bank has ${
+            (bankItems?.bank.find((bib) => bib.code === bi.code)?.quantity ??
+              0) - claimed.quantity
+          } x ${bi.code} left`,
+        );
+        if (claimed.quantity <= 0 && bankItems) {
+          bankItems.claimed = bankItems?.claimed.filter((c) =>
+            c.code !== bi.code
+          );
+        }
+      } else {
+        bankItems?.claimed.push(bi);
+      }
+    });
+
+    actionQueue.unshift(
+      async () => await moveCharacter(character, { x: 4, y: 1 }),
+      ...bankItemsNeeded.map((bi) => async () =>
+        await withdraw(character, {
+          item_code: bi.code,
+          quantity: bi.quantity,
+        })
+      ),
+      async () => await flowToResume(character, actionQueue),
     );
     return true;
   }
@@ -294,7 +362,7 @@ function craftingFlow(
           return res;
         })
       : async () => await restCharacter(character),
-    () => flowToResume(character, actionQueue),
+    async () => await flowToResume(character, actionQueue),
   );
   return true;
 }
