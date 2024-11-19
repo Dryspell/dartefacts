@@ -14,8 +14,7 @@ export const equipmentSlots = [
   { slot_key: "artifact2_slot", type: "artifact" },
   { slot_key: "artifact3_slot", type: "artifact" },
   { slot_key: "utility1_slot", type: "utility" },
-  { slot_key: "utility1_slot", type: "utility" },
-  { slot_key: "utility1_slot", type: "utility" },
+  { slot_key: "utility2_slot", type: "utility" },
 ] as const;
 
 export const craftingSkills = [

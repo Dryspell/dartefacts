@@ -225,11 +225,11 @@ export async function craft(character: CharacterData, item_code: string) {
       return result;
     } else {
       console.log(
-        `[${character.name}] Failed to craft`,
+        `[${character.name}] Failed to craft ${item_code}`,
         res.status,
         await res.text(),
       );
-      return null;
+      return true;
     }
   });
 }
@@ -359,9 +359,10 @@ export async function withdraw(
   character: CharacterData,
   { item_code, quantity }: { item_code: string; quantity: number },
 ) {
+  if (quantity <= 0) quantity = 1;
   const { data, error } = await client.POST("/my/{name}/action/bank/withdraw", {
     params: { path: { name: character.name } },
-    body: { code: item_code, quantity },
+    body: { code: item_code, quantity: quantity || 1 },
     headers: artifactsHeaders(),
   });
 

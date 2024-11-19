@@ -53,7 +53,9 @@ const findBestInSlot = (
 };
 
 export const findBestEquipment = (character: CharacterData) =>
-  equipmentSlots.map((slot) => ({
+  equipmentSlots.filter((slot) =>
+    slot.slot_key !== "utility1_slot" && slot.slot_key !== "utility2_slot"
+  ).map((slot) => ({
     ...slot,
     best: findBestInSlot(slot, character),
   })).filter((equipment) =>
@@ -66,6 +68,7 @@ export const findBestEquipment = (character: CharacterData) =>
 export const createCraftingPlan = (
   character: CharacterData,
   itemToCraft: ReturnType<typeof findBestInSlot>,
+  quantity = 1,
 ) => {
   if (!itemToCraft) {
     return null;
@@ -117,7 +120,7 @@ export const createCraftingPlan = (
     }
   };
 
-  walkItemRecipeTree(itemToCraft);
+  walkItemRecipeTree(itemToCraft, quantity);
 
   const firstItemNeeded = itemsNeeded[0] &&
     items.find((i) => i.code === itemsNeeded[0].code);
@@ -168,15 +171,27 @@ export const findCraftableFood = (character: CharacterData) => {
   return food;
 };
 
-const healingItems = items.filter((item) =>
+const foodItems = items.filter((item) =>
   item.type === "consumable" && item.subtype === "food" &&
   item.effects.some((effect) => effect.name === "heal")
 );
 
-export const getHealingItemsInInventory = (character: CharacterData) => {
-  return healingItems.filter((healingItem) =>
+export const getFoodItemsInInventory = (character: CharacterData) => {
+  return foodItems.filter((healingItem) =>
     character.inventory?.find((item) => item.code === healingItem.code)
   ).sort((a, b) => b.effects[0].value - a.effects[0].value);
+};
+
+const healingPotions = items.filter((item) =>
+  item.type === "utility" && item.subtype === "potion" &&
+  item.effects.some((effect) => effect.name === "restore")
+);
+
+export const getBestCraftableHealingPotions = (character: CharacterData) => {
+  return healingPotions.filter((healingItem) =>
+    healingItem.craft &&
+    healingItem.craft.level <= character.alchemy_level
+  ).sort((a, b) => b.effects[0].value - a.effects[0].value)[0];
 };
 
 export const getAllBankItems = async () => {
@@ -202,4 +217,15 @@ export const getAllBankItems = async () => {
   }
 
   return { bank: items, claimed: [] as ItemElement[] };
+};
+
+export const itemsInInventoryCount = (character: CharacterData) => {
+  const amt = character.inventory &&
+      (character.inventory.reduce((acc, item) => acc + item.quantity, 0) ??
+        0) || 0;
+
+  const remaining = character.inventory &&
+      character.inventory_max_items - amt || 0;
+
+  return { amt, remaining };
 };

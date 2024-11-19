@@ -4,6 +4,7 @@ import { artifactsHeaders } from "./actions.ts";
 import { ARTIFACTS_BASE_URL } from "./constants.ts";
 import { ActionQueue, CharacterData } from "./types.ts";
 import {
+  craftBestHealthPotions,
   craftBestInSlot,
   craftPossibleFood,
   healCharacter,
@@ -35,16 +36,13 @@ const runBot = async () => {
 
   await Promise.all(
     characters.map(async (character) => {
-      const actionQueue = [] as ActionQueue;
-
-      healCharacter(character, actionQueue);
-
-      // Craft food if we can.
-      craftPossibleFood(character, actionQueue);
-
-      craftBestInSlot(character, actionQueue);
-
-      trainWeakestCraftingSkill(character, actionQueue);
+      const actionQueue = [
+        () => healCharacter(character, actionQueue),
+        () => craftPossibleFood(character, actionQueue),
+        () => craftBestHealthPotions(character, actionQueue),
+        () => craftBestInSlot(character, actionQueue),
+        () => trainWeakestCraftingSkill(character, actionQueue),
+      ] as ActionQueue;
 
       while (actionQueue.length) {
         const action = actionQueue.shift();
